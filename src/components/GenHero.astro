@@ -1,0 +1,20 @@
+---
+import AnimatedCanvas from "./AnimatedCanvas";
+import type { AnimatedCanvasProps } from "./AnimatedCanvas";
+
+// The props interface now includes width and height
+interface Props extends AnimatedCanvasProps {}
+
+const { ...props } = Astro.props;
+---
+
+<AnimatedCanvas client:visible {...props} className="gen-hero-canvas" />
+
+<style>
+    .gen-hero-canvas {
+        margin-bottom: 0.5rem;
+        border-radius: 12px;
+        transition: 0.2s ease;
+        max-width: 100px;
+    }
+</style>

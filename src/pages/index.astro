@@ -1,0 +1,30 @@
+---
+import BaseHead from "../components/BaseHead.astro";
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
+---
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+    </head>
+    <body>
+        <Header />
+        <main>
+            <h1>Greetings, Netizen!</h1>
+            <p>Welcome to my over-engineered devlog.</p>
+            <p>
+                This is my little corner of the small batch internet, where I
+                document projects, experiments, and insights gained on a journey
+                towards life long learning in software development.
+            </p>
+            <p>
+                If it looks a little sparse, that's because we're only just
+                getting started.
+            </p>
+        </main>
+        <Footer />
+    </body>
+</html>

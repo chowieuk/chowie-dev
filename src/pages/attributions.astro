@@ -1,0 +1,51 @@
+---
+import BaseHead from "../components/BaseHead.astro";
+import Footer from "../components/Footer.astro";
+import Header from "../components/Header.astro";
+import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
+---
+
+<!doctype html>
+<html lang="en">
+    <head>
+        <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
+    </head>
+    <body>
+        <Header />
+        <main>
+            <h1>Attributions</h1>
+            <h2>Graphics</h2>
+            <p>
+                The SVG rendition of the Sierpinski carpet series used as
+                favicons for this site were created by <a
+                    href="https://commons.wikimedia.org/wiki/User:Joey-das-WBF"
+                    >Johannes Rössel</a
+                >, Public domain, hosted via Wikimedia Commons.
+            </p>
+
+            <p>
+                The four generative art pieces presented in the about and blog
+                pages have been adapted from <a href="https://chrisloy.dev/"
+                    >Chris Loy's</a
+                > work. Chris Loy has made their source code available on <a
+                    href="https://github.com/chrisloy/fractavibes">GitHub</a
+                > under the Apache License 2.0. You can see their original implementation
+                at <a href="https://fractavibes.chrisloy.dev/"
+                    >fractavibes.chrisloy.dev</a
+                >.
+            </p>
+            <p>
+                I have made some minor modifications to the original code to:
+                <ul>
+                    <li>Remove the interactive element and log statements</li>
+                    <li>Automatically begin the animations</li>
+                    <li>Place it within an Astro component</li>
+                </ul>
+                You can access the modified version via <a
+                    href="https://github.com/chowieuk/chowie-dev/">GitHub</a
+                >
+            </p>
+        </main>
+        <Footer />
+    </body>
+</html>

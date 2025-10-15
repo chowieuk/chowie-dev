@@ -1,0 +1,131 @@
+---
+// Import the global.css file here so that it is included on
+// all pages through the use of the <BaseHead /> component.
+import "../styles/global.css";
+import type { ImageMetadata } from "astro";
+import { ClientRouter } from "astro:transitions";
+import FallbackImage from "../assets/blog-placeholder-1.jpg";
+import { SITE_TITLE } from "../consts";
+
+interface Props {
+    title: string;
+    description: string;
+    image?: ImageMetadata;
+}
+
+const canonicalURL = new URL(Astro.url.pathname, Astro.site);
+
+const { title, description, image = FallbackImage } = Astro.props;
+---
+
+<!-- Global Metadata -->
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link
+    id="dynamic-favicon"
+    rel="icon"
+    type="image/svg+xml"
+    href="https://upload.wikimedia.org/wikipedia/commons/0/03/Sierpinski_carpet_2.svg"
+/>
+<link rel="sitemap" href="/sitemap-index.xml" />
+<link
+    rel="alternate"
+    type="application/rss+xml"
+    title={SITE_TITLE}
+    href={new URL("rss.xml", Astro.site)}
+/>
+<meta name="generator" content={Astro.generator} />
+
+<!-- Dynamic Sierpinski Carpet Favicon -->
+
+<script>
+    window.faviconAnimationState = window.faviconAnimationState || {
+        intervalId: null,
+        currentIndex: 2,
+        direction: 1,
+    };
+
+    const faviconUrls = [
+        "https://upload.wikimedia.org/wikipedia/commons/a/ad/Sierpinski_carpet_0.svg",
+        "https://upload.wikimedia.org/wikipedia/commons/0/05/Sierpinski_carpet_1.svg",
+        "https://upload.wikimedia.org/wikipedia/commons/0/03/Sierpinski_carpet_2.svg",
+        "https://upload.wikimedia.org/wikipedia/commons/b/b7/Sierpinski_carpet_3.svg",
+        // You simply can't see the detail provided by the following iterations when viewed at 32 x 32
+        // "https://upload.wikimedia.org/wikipedia/commons/5/55/Sierpinski_carpet_4.svg",
+        // "https://upload.wikimedia.org/wikipedia/commons/2/2d/Sierpinski_carpet_5.svg",
+        // "https://upload.wikimedia.org/wikipedia/commons/4/4e/Sierpinski_carpet_6.svg",
+    ];
+    const intervalDuration = 1500;
+
+    function stepAnimation() {
+        const favicon = document.getElementById(
+            "dynamic-favicon",
+        ) as HTMLLinkElement;
+        const state = window.faviconAnimationState;
+
+        if (!favicon) return;
+
+        state.currentIndex += state.direction;
+        favicon.href = faviconUrls[state.currentIndex];
+
+        if (
+            state.currentIndex === 0 ||
+            state.currentIndex === faviconUrls.length - 1
+        ) {
+            state.direction *= -1; // Reverse direction
+        }
+    }
+
+    function runFaviconAnimation() {
+        const favicon = document.getElementById(
+            "dynamic-favicon",
+        ) as HTMLLinkElement;
+
+        if (
+            !favicon ||
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ) {
+            return;
+        }
+
+        favicon.href = faviconUrls[window.faviconAnimationState.currentIndex];
+
+        window.faviconAnimationState.intervalId = setInterval(
+            stepAnimation,
+            intervalDuration,
+        );
+    }
+
+    function stopFaviconAnimation() {
+        if (window.faviconAnimationState.intervalId) {
+            clearInterval(window.faviconAnimationState.intervalId);
+        }
+    }
+
+    runFaviconAnimation();
+    document.addEventListener("astro:before-swap", stopFaviconAnimation);
+    document.addEventListener("astro:after-swap", runFaviconAnimation);
+</script>
+
+<!-- Canonical URL -->
+<link rel="canonical" href={canonicalURL} />
+
+<!-- Primary Meta Tags -->
+<title>{title}</title>
+<meta name="title" content={title} />
+<meta name="description" content={description} />
+<ClientRouter />
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content={Astro.url} />
+<meta property="og:title" content={title} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={new URL(image.src, Astro.url)} />
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:url" content={Astro.url} />
+<meta property="twitter:title" content={title} />
+<meta property="twitter:description" content={description} />
+<meta property="twitter:image" content={new URL(image.src, Astro.url)} />

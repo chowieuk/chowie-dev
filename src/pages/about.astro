@@ -1,0 +1,63 @@
+---
+import { randomAlgorithm } from "../consts";
+import Layout from "../layouts/BlogPost.astro";
+---
+
+<Layout
+    title="About Me"
+    description="About "
+    pubDate={new Date("October 14 2025")}
+    heroCanvas={{ algorithm: randomAlgorithm() }}
+>
+    <p>
+        Hello, my name is Chris Howie, but you can call me Chowie. I am a
+        software engineer based in Vancouver, Canada, and this is my personal
+        devlog.
+    </p>
+    <p>
+        It begins as mainly a vehicle for learning, praxis, and project
+        exposure. In what some may consider a mistake, it is intentionally
+        over-engineered.
+    </p>
+    <p>
+        As of writing:
+        <ul>
+            <li>
+                I am mostly interested in:
+                <ul>
+                    <li>generative art</li>
+                    <li>browser games</li>
+                </ul>
+            </li>
+            <li>
+                This blog is:
+                <ul>
+                    <li>
+                        Built with <a href="https://astro.build/">Astro</a>,
+                        adapted from the official blog starter template.
+                    </li>
+                    <li>
+                        Continuously integrated using <a
+                            href="https://argoproj.io/">Argo CD</a
+                        > and <a href="https://github.com/features/actions"
+                            >GitHub Actions</a
+                        >.
+                    </li>
+                    <li>
+                        Containerized using <a href="https://www.docker.com/"
+                            >Docker</a
+                        >, deployed on a lightweight <a href="https://k3s.io/"
+                            >K3s</a
+                        > cluster.
+                    </li>
+                    <li>
+                        Hosted on a <a href="https://www.hetzner.com/"
+                            >Hetzner</a
+                        > VPS.
+                    </li>
+                </ul>
+            </li>
+        </ul>
+    </p>
+    <p></p>
+</Layout>
