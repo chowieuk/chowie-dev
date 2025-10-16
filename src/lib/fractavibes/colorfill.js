@@ -3,7 +3,24 @@ export function runColorFill(ctx, canvasWidth, canvasHeight, seedX, seedY) {
   const w = canvasWidth;
   const h = canvasHeight;
   ctx.clearRect(0, 0, w, h);
+
+  const circleCenterX = seedX;
+  const circleCenterY = seedY;
+  const circleRadius =
+    Math.min(seedX, canvasWidth - seedX, seedY, canvasHeight - seedY) *
+    0.618033;
+  const circleRadiusSq = circleRadius * circleRadius;
+
   const img = ctx.getImageData(0, 0, w, h);
+
+  function isInBounds(x, y) {
+    const rx = Math.round(x);
+    const ry = Math.round(y);
+    const dx = rx - circleCenterX;
+    const dy = ry - circleCenterY;
+    return dx * dx + dy * dy <= circleRadiusSq;
+  }
+
   const visited = new Set(); // Stores numeric key: y * w + x
 
   const FRONTIER_BIAS_EXPONENT = Math.floor(Math.random() * 5) + 3;
@@ -66,14 +83,7 @@ export function runColorFill(ctx, canvasWidth, canvasHeight, seedX, seedY) {
 
   function addFrontier(x, y) {
     const key = y * w + x;
-    if (
-      x >= 0 &&
-      x < w &&
-      y >= 0 &&
-      y < h &&
-      !visited.has(key) &&
-      !frontier.has(key)
-    ) {
+    if (isInBounds(x, y) && !visited.has(key) && !frontier.has(key)) {
       frontier.set(key, [x, y]);
       frontierWeights.set(key, computeWeight(x, y));
     }

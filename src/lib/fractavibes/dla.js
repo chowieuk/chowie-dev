@@ -14,8 +14,21 @@ export function runDLA(
   const img = ctx.getImageData(0, 0, w, h);
   const visited = new Set(); // Stores "y * w + x" for aggregated particles for O(1) lookups
 
+  const circleCenterX = seedX;
+  const circleCenterY = seedY;
+  const circleRadius =
+    Math.min(seedX, canvasWidth - seedX, seedY, canvasHeight - seedY) *
+    0.618033;
+  const circleRadiusSq = circleRadius * circleRadius;
+
+  function isInBounds(x, y) {
+    const dx = x - circleCenterX;
+    const dy = y - circleCenterY;
+    return dx * dx + dy * dy <= circleRadiusSq;
+  }
+
   let aggregatedParticlesCount = 0;
-  const MAX_PARTICLES = w * h; // Stop when canvas is full
+  const MAX_PARTICLES = Math.floor(Math.PI * circleRadius * circleRadius);
 
   // --- PERFORMANCE TUNING PARAMETERS ---
   // Increased to process more walkers per frame, trading smoothness for speed.
@@ -41,19 +54,12 @@ export function runDLA(
 
   function getDlaNeighborColors(x, y) {
     const colors = [];
-    // Check all 8 neighbors
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
         if (dx === 0 && dy === 0) continue;
         const nx = x + dx,
           ny = y + dy;
-        if (
-          nx >= 0 &&
-          nx < w &&
-          ny >= 0 &&
-          ny < h &&
-          visited.has(ny * w + nx)
-        ) {
+        if (isInBounds(nx, ny) && visited.has(ny * w + nx)) {
           const idx = (ny * w + nx) * 4;
           colors.push({
             r: img.data[idx],
@@ -186,15 +192,9 @@ export function runDLA(
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
             if (dx === 0 && dy === 0) continue;
-            const nx = walkerX + dx;
-            const ny = walkerY + dy;
-            if (
-              nx >= 0 &&
-              nx < w &&
-              ny >= 0 &&
-              ny < h &&
-              visited.has(ny * w + nx)
-            ) {
+            const nx = walkerX + dx,
+              ny = walkerY + dy;
+            if (isInBounds(nx, ny) && visited.has(ny * w + nx)) {
               isAdjacentToAggregate = true;
               break;
             }
@@ -222,26 +222,8 @@ export function runDLA(
         const moveDx = Math.floor(Math.random() * 3) - 1;
         const moveDy = Math.floor(Math.random() * 3) - 1;
 
-        const nextX = walkerX + moveDx;
-        const nextY = walkerY + moveDy;
-
-        // Check if walker has wandered too far (kill radius)
-        const distSq = (nextX - centerX) ** 2 + (nextY - centerY) ** 2;
-        if (distSq > killRadiusSq) {
-          break; // Walker is lost, terminate its path
-        }
-
-        // Check canvas boundaries
-        if (nextX < 0 || nextX >= w || nextY < 0 || nextY >= h) {
-          // You could also 'break' here to terminate walkers that hit the edge
-          continue;
-        }
-
-        // Check collision with other aggregated particles (this would be rare)
-        if (visited.has(nextY * w + nextX)) {
-          continue;
-        }
-
+        if (!isInBounds(nextX, nextY)) continue;
+        if (visited.has(nextY * w + nextX)) continue;
         walkerX = nextX;
         walkerY = nextY;
       }

@@ -4,7 +4,13 @@ export function runSpiral(ctx, canvasWidth, canvasHeight, seedX, seedY) {
   const w = canvasWidth;
   const h = canvasHeight;
   ctx.clearRect(0, 0, w, h);
+
+  const circleRadius =
+    Math.min(seedX, canvasWidth - seedX, seedY, canvasHeight - seedY) *
+    0.618033;
+
   const img = ctx.getImageData(0, 0, w, h);
+
   const paintedMask = Array(h)
     .fill(null)
     .map(() => Array(w).fill(false)); // Tracks algorithm-painted pixels
@@ -39,6 +45,7 @@ export function runSpiral(ctx, canvasWidth, canvasHeight, seedX, seedY) {
         const dx = x - seedX;
         const dy = y - seedY;
         const radius = Math.sqrt(dx * dx + dy * dy);
+        if (radius > circleRadius) continue;
         // Normalize angle to [0, 2*PI) for consistent sorting
         let angle = Math.atan2(dy, dx);
         if (angle < 0) {
