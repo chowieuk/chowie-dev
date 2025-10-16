@@ -31,13 +31,18 @@ export function runDLA(
   const MAX_PARTICLES = Math.floor(Math.PI * circleRadius * circleRadius);
 
   // --- PERFORMANCE TUNING PARAMETERS ---
-  // Increased to process more walkers per frame, trading smoothness for speed.
   const PARTICLES_PER_FRAME = 250;
-  // Reduced, as smart spawning and kill radius make long walks less necessary.
-  const MAX_WALKER_STEPS = 2000;
-  // Increased to reduce expensive ctx.putImageData calls.
+  // Increased steps for walkers that might start far from the aggregate in phase 2
+  const MAX_WALKER_STEPS = 5000;
   const DRAW_INTERVAL = 50;
-  // --- END OF TUNING PARAMETERS ---
+
+  // This flag will switch our spawning strategy once the aggregate hits the boundary.
+  let fillPhaseActive = false;
+
+  // --- CONSOLE LOGS FOR DEBUGGING ---
+  let lastLoggedCount = 0;
+  let framesWithNoGrowth = 0;
+  console.log(`DLA Started. Target particles: ${MAX_PARTICLES}`);
 
   const DLA_SIMILARITY_PERCENT = 0.98;
   const DLA_SIMILAR_VARIATION = 3;
@@ -46,7 +51,6 @@ export function runDLA(
   let particlesSinceLastDraw = 0;
   let animationFrameId = null;
 
-  // Bounding box for the aggregate, used for optimized spawning.
   let minX = seedX,
     maxX = seedX,
     minY = seedY,
@@ -80,8 +84,6 @@ export function runDLA(
         b: Math.random() * 255,
       };
     }
-
-    // Optimization: Sum first, then divide once.
     const sum = neighborColors.reduce(
       (acc, col) => ({
         r: acc.r + col.r,
@@ -90,13 +92,11 @@ export function runDLA(
       }),
       { r: 0, g: 0, b: 0 },
     );
-
     const avg = {
       r: sum.r / neighborColors.length,
       g: sum.g / neighborColors.length,
       b: sum.b / neighborColors.length,
     };
-
     const useSimilar =
       neighborColors.length >= 3 || Math.random() < DLA_SIMILARITY_PERCENT;
     const variation = useSimilar
@@ -106,7 +106,6 @@ export function runDLA(
       neighborColors.length >= 2
         ? 1 / Math.pow(neighborColors.length, 0.17)
         : 1;
-
     return {
       r:
         Math.min(
@@ -140,54 +139,91 @@ export function runDLA(
     return null;
   }
 
-  // Initial seed placement
-  if (!seedColor) {
-    seedColor = generateDlaInfluencedColor([]);
-  }
+  if (!seedColor) seedColor = generateDlaInfluencedColor([]);
   paintPixel(seedX, seedY, seedColor);
   visited.add(seedY * w + seedX);
   aggregatedParticlesCount++;
-  ctx.putImageData(img, 0, 0); // Draw initial seed
+  ctx.putImageData(img, 0, 0);
 
   function animationStep() {
     if (aggregatedParticlesCount >= MAX_PARTICLES) {
-      // console.log("DLA finished: Max particles reached.");
+      console.log("DLA finished: Max particles reached.");
       ctx.putImageData(img, 0, 0);
       animationFrameId = null;
       return;
     }
 
+    const particlesAddedThisFrame = aggregatedParticlesCount;
+
     for (let i = 0; i < PARTICLES_PER_FRAME; i++) {
       if (aggregatedParticlesCount >= MAX_PARTICLES) break;
 
-      // --- OPTIMIZATION 1: Spawn walkers on a radius around the aggregate ---
-      const centerX = (minX + maxX) / 2;
-      const centerY = (minY + maxY) / 2;
-      const radiusX = Math.max(centerX - minX, maxX - centerX);
-      const radiusY = Math.max(centerY - minY, maxY - centerY);
-      const spawnRadius = Math.sqrt(radiusX * radiusX + radiusY * radiusY) + 15; // +15 pixel margin
+      let walkerX, walkerY;
+      let spawnedSuccessfully = false;
+      const MAX_SPAWN_ATTEMPTS = 100;
 
-      const angle = Math.random() * 2 * Math.PI;
-      let walkerX = Math.floor(centerX + spawnRadius * Math.cos(angle));
-      let walkerY = Math.floor(centerY + spawnRadius * Math.sin(angle));
+      for (let attempt = 0; attempt < MAX_SPAWN_ATTEMPTS; attempt++) {
+        // --- FINAL RECTIFICATION: TWO-PHASE SPAWNING LOGIC ---
 
-      // Clamp to canvas bounds
-      walkerX = Math.max(0, Math.min(w - 1, walkerX));
-      walkerY = Math.max(0, Math.min(h - 1, walkerY));
+        if (!fillPhaseActive) {
+          // PHASE 1: Growth Phase. Spawn in a ring around the aggregate.
+          const aggregateCenterX = (minX + maxX) / 2;
+          const aggregateCenterY = (minY + maxY) / 2;
+          const radiusX = Math.max(
+            aggregateCenterX - minX,
+            maxX - aggregateCenterX,
+          );
+          const radiusY = Math.max(
+            aggregateCenterY - minY,
+            maxY - aggregateCenterY,
+          );
+          const aggregateRadius = Math.sqrt(
+            radiusX * radiusX + radiusY * radiusY,
+          );
 
-      // If we spawn on an existing particle by chance, just skip this walker.
-      if (visited.has(walkerY * w + walkerX)) {
-        continue;
+          // Check if the spawn ring would go outside our main circle boundary.
+          if (aggregateRadius + 15 >= circleRadius) {
+            fillPhaseActive = true;
+            console.log(
+              `Switching to 'Fill Phase' at ${aggregatedParticlesCount} particles.`,
+            );
+            // Fall through to the 'fillPhaseActive' block below
+          } else {
+            const spawnRadius = aggregateRadius + 15;
+            const angle = Math.random() * 2 * Math.PI;
+            walkerX = Math.floor(
+              aggregateCenterX + spawnRadius * Math.cos(angle),
+            );
+            walkerY = Math.floor(
+              aggregateCenterY + spawnRadius * Math.sin(angle),
+            );
+          }
+        }
+
+        if (fillPhaseActive) {
+          // PHASE 2: Fill Phase. Spawn randomly ANYWHERE inside the circle.
+          // This is the robust method that ensures gaps are filled.
+          const angle = Math.random() * 2 * Math.PI;
+          // Use Math.sqrt() on the random number to ensure uniform distribution
+          const radius = circleRadius * Math.sqrt(Math.random());
+          walkerX = Math.floor(circleCenterX + radius * Math.cos(angle));
+          walkerY = Math.floor(circleCenterY + radius * Math.sin(angle));
+        }
+
+        // Check if the randomly chosen spot is already occupied. If so, retry.
+        if (!visited.has(walkerY * w + walkerX)) {
+          spawnedSuccessfully = true;
+          break; // Exit spawn attempt loop
+        }
       }
 
-      // --- OPTIMIZATION 2: Define a "kill radius" to terminate lost walkers ---
-      const killRadius = spawnRadius * 2;
-      const killRadiusSq = killRadius * killRadius;
+      if (!spawnedSuccessfully) {
+        continue; // Failed to spawn a particle, move to the next one in the frame.
+      }
 
       let currentWalkerSteps = 0;
       while (currentWalkerSteps < MAX_WALKER_STEPS) {
         currentWalkerSteps++;
-
         let isAdjacentToAggregate = false;
         for (let dy = -1; dy <= 1; dy++) {
           for (let dx = -1; dx <= 1; dx++) {
@@ -203,24 +239,24 @@ export function runDLA(
         }
 
         if (isAdjacentToAggregate) {
-          const neighborColors = getDlaNeighborColors(walkerX, walkerY);
-          const newColor = generateDlaInfluencedColor(neighborColors);
+          const newColor = generateDlaInfluencedColor(
+            getDlaNeighborColors(walkerX, walkerY),
+          );
           paintPixel(walkerX, walkerY, newColor);
           visited.add(walkerY * w + walkerX);
-
-          // Update the bounding box for the next spawn
           minX = Math.min(minX, walkerX);
           maxX = Math.max(maxX, walkerX);
           minY = Math.min(minY, walkerY);
           maxY = Math.max(maxY, walkerY);
-
           aggregatedParticlesCount++;
           particlesSinceLastDraw++;
-          break; // Walker has stuck, exit its while loop
+          break;
         }
 
         const moveDx = Math.floor(Math.random() * 3) - 1;
         const moveDy = Math.floor(Math.random() * 3) - 1;
+        const nextX = walkerX + moveDx,
+          nextY = walkerY + moveDy;
 
         if (!isInBounds(nextX, nextY)) continue;
         if (visited.has(nextY * w + nextX)) continue;
@@ -229,29 +265,51 @@ export function runDLA(
       }
     }
 
+    if (aggregatedParticlesCount > lastLoggedCount + 5000) {
+      lastLoggedCount = aggregatedParticlesCount;
+      const percent = ((lastLoggedCount / MAX_PARTICLES) * 100).toFixed(2);
+      console.log(
+        `Progress: ${lastLoggedCount} / ${MAX_PARTICLES} (${percent}%)`,
+      );
+    }
+    if (aggregatedParticlesCount === particlesAddedThisFrame) {
+      framesWithNoGrowth++;
+      if (framesWithNoGrowth > 200) {
+        console.warn(
+          "Simulation appears to have stalled. No new particles are being added.",
+        );
+        framesWithNoGrowth = -1000; // Reset with a long delay to avoid spamming
+      }
+    } else {
+      framesWithNoGrowth = 0;
+    }
+
     if (particlesSinceLastDraw >= DRAW_INTERVAL) {
       ctx.putImageData(img, 0, 0);
       particlesSinceLastDraw = 0;
     }
 
-    // Schedule the next animation frame
     if (aggregatedParticlesCount < MAX_PARTICLES) {
       animationFrameId = requestAnimationFrame(animationStep);
     } else {
-      ctx.putImageData(img, 0, 0); // Final draw
+      ctx.putImageData(img, 0, 0);
       animationFrameId = null;
-      // console.log("DLA finished: Max particles reached (final check).");
+      const percent = (
+        (aggregatedParticlesCount / MAX_PARTICLES) *
+        100
+      ).toFixed(2);
+      console.log(
+        `DLA finished: ${aggregatedParticlesCount} / ${MAX_PARTICLES} (${percent}%)`,
+      );
     }
   }
 
-  animationFrameId = requestAnimationFrame(animationStep); // Start the loop
+  animationFrameId = requestAnimationFrame(animationStep);
 
   return {
     cancel: () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-        animationFrameId = null;
-      }
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
     },
   };
 }
