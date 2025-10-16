@@ -34,11 +34,6 @@ export function runDLA(
   // This flag will switch our spawning strategy once the aggregate hits the boundary.
   let fillPhaseActive = false;
 
-  // --- CONSOLE LOGS FOR DEBUGGING ---
-  let lastLoggedCount = 0;
-  let framesWithNoGrowth = 0;
-  console.log(`DLA Started. Target particles: ${MAX_PARTICLES}`);
-
   const DLA_SIMILARITY_PERCENT = 0.98;
   const DLA_SIMILAR_VARIATION = 3;
   const DLA_DISSIMILAR_VARIATION = 20;
@@ -142,7 +137,6 @@ export function runDLA(
 
   function animationStep() {
     if (aggregatedParticlesCount >= MAX_PARTICLES) {
-      console.log("DLA finished: Max particles reached.");
       ctx.putImageData(img, 0, 0);
       animationFrameId = null;
       return;
@@ -179,9 +173,6 @@ export function runDLA(
           // Check if the spawn ring would go outside our main circle boundary.
           if (aggregateRadius + 15 >= circleRadius) {
             fillPhaseActive = true;
-            console.log(
-              `Switching to 'Fill Phase' at ${aggregatedParticlesCount} particles.`,
-            );
             // Fall through to the 'fillPhaseActive' block below
           } else {
             const spawnRadius = aggregateRadius + 15;
@@ -260,25 +251,6 @@ export function runDLA(
       }
     }
 
-    if (aggregatedParticlesCount > lastLoggedCount + 5000) {
-      lastLoggedCount = aggregatedParticlesCount;
-      const percent = ((lastLoggedCount / MAX_PARTICLES) * 100).toFixed(2);
-      console.log(
-        `Progress: ${lastLoggedCount} / ${MAX_PARTICLES} (${percent}%)`,
-      );
-    }
-    if (aggregatedParticlesCount === particlesAddedThisFrame) {
-      framesWithNoGrowth++;
-      if (framesWithNoGrowth > 200) {
-        console.warn(
-          "Simulation appears to have stalled. No new particles are being added.",
-        );
-        framesWithNoGrowth = -1000; // Reset with a long delay to avoid spamming
-      }
-    } else {
-      framesWithNoGrowth = 0;
-    }
-
     if (particlesSinceLastDraw >= DRAW_INTERVAL) {
       ctx.putImageData(img, 0, 0);
       particlesSinceLastDraw = 0;
@@ -289,13 +261,6 @@ export function runDLA(
     } else {
       ctx.putImageData(img, 0, 0);
       animationFrameId = null;
-      const percent = (
-        (aggregatedParticlesCount / MAX_PARTICLES) *
-        100
-      ).toFixed(2);
-      console.log(
-        `DLA finished: ${aggregatedParticlesCount} / ${MAX_PARTICLES} (${percent}%)`,
-      );
     }
   }
 
