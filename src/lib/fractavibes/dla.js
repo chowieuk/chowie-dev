@@ -1,4 +1,5 @@
 // https://github.com/chrisloy/fractavibes
+import { calculateCircularBounds } from "./shared.js";
 
 export function runDLA(
   ctx,
@@ -14,18 +15,12 @@ export function runDLA(
   const img = ctx.getImageData(0, 0, w, h);
   const visited = new Set(); // Stores "y * w + x" for aggregated particles for O(1) lookups
 
-  const circleCenterX = seedX;
-  const circleCenterY = seedY;
-  const circleRadius =
-    Math.min(seedX, canvasWidth - seedX, seedY, canvasHeight - seedY) *
-    0.618033;
-  const circleRadiusSq = circleRadius * circleRadius;
-
-  function isInBounds(x, y) {
-    const dx = x - circleCenterX;
-    const dy = y - circleCenterY;
-    return dx * dx + dy * dy <= circleRadiusSq;
-  }
+  const {
+    centerX: circleCenterX,
+    centerY: circleCenterY,
+    radius: circleRadius,
+    isInBounds,
+  } = calculateCircularBounds(canvasWidth, canvasHeight, seedX, seedY);
 
   let aggregatedParticlesCount = 0;
   const MAX_PARTICLES = Math.floor(Math.PI * circleRadius * circleRadius);

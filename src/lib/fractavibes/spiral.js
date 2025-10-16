@@ -1,13 +1,17 @@
 // https://github.com/chrisloy/fractavibes
+import { calculateCircularBounds } from "./shared";
 
 export function runSpiral(ctx, canvasWidth, canvasHeight, seedX, seedY) {
   const w = canvasWidth;
   const h = canvasHeight;
   ctx.clearRect(0, 0, w, h);
 
-  const circleRadius =
-    Math.min(seedX, canvasWidth - seedX, seedY, canvasHeight - seedY) *
-    0.618033;
+  const { radius: circleRadius } = calculateCircularBounds(
+    canvasWidth,
+    canvasHeight,
+    seedX,
+    seedY,
+  );
 
   const img = ctx.getImageData(0, 0, w, h);
 

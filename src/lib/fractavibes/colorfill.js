@@ -1,25 +1,13 @@
 // https://github.com/chrisloy/fractavibes
+import { calculateCircularBounds } from "./shared";
+
 export function runColorFill(ctx, canvasWidth, canvasHeight, seedX, seedY) {
   const w = canvasWidth;
   const h = canvasHeight;
   ctx.clearRect(0, 0, w, h);
 
-  const circleCenterX = seedX;
-  const circleCenterY = seedY;
-  const circleRadius =
-    Math.min(seedX, canvasWidth - seedX, seedY, canvasHeight - seedY) *
-    0.618033;
-  const circleRadiusSq = circleRadius * circleRadius;
-
+  const { isInBounds } = calculateCircularBounds(w, h, seedX, seedY);
   const img = ctx.getImageData(0, 0, w, h);
-
-  function isInBounds(x, y) {
-    const rx = Math.round(x);
-    const ry = Math.round(y);
-    const dx = rx - circleCenterX;
-    const dy = ry - circleCenterY;
-    return dx * dx + dy * dy <= circleRadiusSq;
-  }
 
   const visited = new Set(); // Stores numeric key: y * w + x
 

@@ -1,4 +1,5 @@
 // https://github.com/chrisloy/fractavibes
+import { calculateCircularBounds } from "./shared";
 
 export function runInkDrop(ctx, canvasWidth, canvasHeight, seedX, seedY) {
   const w = canvasWidth;
@@ -6,12 +7,12 @@ export function runInkDrop(ctx, canvasWidth, canvasHeight, seedX, seedY) {
 
   ctx.clearRect(0, 0, w, h);
 
-  const circleCenterX = seedX;
-  const circleCenterY = seedY;
-  const circleRadius =
-    Math.min(seedX, canvasWidth - seedX, seedY, canvasHeight - seedY) *
-    0.618033;
-  const circleRadiusSq = circleRadius * circleRadius;
+  const {
+    centerX: circleCenterX,
+    centerY: circleCenterY,
+    radius: circleRadius,
+    isInBounds,
+  } = calculateCircularBounds(canvasWidth, canvasHeight, seedX, seedY);
 
   // Set circle background to white
   ctx.beginPath();
@@ -20,14 +21,6 @@ export function runInkDrop(ctx, canvasWidth, canvasHeight, seedX, seedY) {
   ctx.fill();
 
   const img = ctx.getImageData(0, 0, w, h);
-
-  function isInBounds(x, y) {
-    const rx = Math.round(x);
-    const ry = Math.round(y);
-    const dx = rx - circleCenterX;
-    const dy = ry - circleCenterY;
-    return dx * dx + dy * dy <= circleRadiusSq;
-  }
 
   // Algorithm parameters
   const MAX_ITERATIONS = 50000;
