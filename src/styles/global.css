@@ -4,6 +4,8 @@ html {
 }
 
 body {
+    max-width: min(100ch, 100% - 4rem);
+    margin-inline: auto;
     font-family: system-ui;
     font-size: 1.25rem;
     line-height: 1.5;
