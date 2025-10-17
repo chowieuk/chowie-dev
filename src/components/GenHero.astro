@@ -8,7 +8,7 @@ interface Props extends AnimatedCanvasProps {}
 const { ...props } = Astro.props;
 ---
 
-<AnimatedCanvas client:visible {...props} className="gen-hero-canvas" />
+<AnimatedCanvas client:load {...props} className="gen-hero-canvas" />
 
 <style>
     .gen-hero-canvas {

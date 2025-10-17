@@ -1,31 +1,32 @@
 ---
-import BaseHead from "../components/BaseHead.astro";
-import Footer from "../components/Footer.astro";
-import Header from "../components/Header.astro";
-import ContentLayout from "../layouts/ContentLayout.astro";
+import BaseLayout from "../layouts/BaseLayout.astro";
 import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
 ---
 
-<!doctype html>
-<html lang="en">
-    <head>
-        <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-    </head>
-    <body>
-        <Header />
-        <ContentLayout>
-            <h1>Greetings, Netizen!</h1>
-            <p>Welcome to my over-engineered devlog.</p>
-            <p>
-                This is my little corner of the small batch internet, where I
-                document projects, experiments, and insights gained on a journey
-                towards life long learning in software development.
-            </p>
-            <p>
-                If it looks a little sparse, that's because we're only just
-                getting started.
-            </p>
-        </ContentLayout>
-        <Footer />
-    </body>
-</html>
+<BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION}>
+    <main>
+        <h1>Greetings, Netizen!</h1>
+        <p>Welcome to my over-engineered devlog.</p>
+        <p>
+            This is my little corner of the small batch internet, where I
+            document projects, experiments, and insights gained on a journey
+            towards life long learning in software development.
+        </p>
+        <p>
+            If it looks a little sparse, that's because we're only just getting
+            started.
+        </p>
+    </main>
+</BaseLayout>
+<style>
+    main {
+        max-width: min(80ch, 100% - 4rem);
+        margin-inline: auto;
+    }
+
+    @media (max-width: 720px) {
+        main {
+            max-width: calc(100% - 2em);
+        }
+    }
+</style>

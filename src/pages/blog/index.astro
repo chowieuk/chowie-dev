@@ -1,9 +1,7 @@
 ---
 import { getCollection } from "astro:content";
-import BaseHead from "../../components/BaseHead.astro";
-import Footer from "../../components/Footer.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
 import FormattedDate from "../../components/FormattedDate.astro";
-import Header from "../../components/Header.astro";
 import { Image } from "astro:assets";
 import GenHero from "../../components/GenHero.astro";
 import { SITE_DESCRIPTION, SITE_TITLE, randomAlgorithm } from "../../consts";
@@ -13,108 +11,98 @@ const posts = (await getCollection("blog"))
     .sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 ---
 
-<!doctype html>
-<html lang="en">
-    <head>
-        <BaseHead title={SITE_TITLE} description={SITE_DESCRIPTION} />
-        <style>
-            ul {
-                display: flex;
-                flex-wrap: wrap;
-                gap: 2rem;
-                list-style-type: none;
-                margin: 0;
-                padding: 0;
-            }
-            ul li {
-                width: calc(50% - 1rem);
-            }
-            ul li * {
-                text-decoration: none;
-                transition: 0.2s ease;
-            }
-            ul li:first-child {
-                width: 100%;
-                margin-bottom: 1rem;
-                text-align: center;
-            }
-            ul li:first-child .title {
-                font-size: 2.369rem;
-            }
-            ul li a {
-                display: block;
-            }
-            .title {
-                margin: 0;
-                color: rgb(var(--black));
-                line-height: 1;
-            }
-            .date {
-                margin: 0;
-                color: rgb(var(--gray));
-            }
-            ul li a:hover h4,
-            ul li a:hover .date {
-                color: rgb(var(--accent));
-            }
-            /* Target the new canvas element's class for the hover effect */
-            ul a:hover :global(.gen-hero-canvas) {
-                box-shadow: var(--box-shadow);
-            }
-            @media (max-width: 720px) {
-                ul {
-                    gap: 0.5em;
+<BaseLayout title={SITE_TITLE} description={SITE_DESCRIPTION}>
+    <main>
+        <section>
+            <ul>
+                {
+                    posts.map((post, index) => (
+                        <li>
+                            <a href={`/blog/${post.id}/`}>
+                                {post.data.heroImage ? (
+                                    <Image
+                                        width={index === 0 ? 1200 : 720}
+                                        height={index === 0 ? 600 : 360}
+                                        src={post.data.heroImage}
+                                        alt=""
+                                    />
+                                ) : (
+                                    <GenHero
+                                        algorithm={randomAlgorithm()}
+                                        width={index === 0 ? 1200 : 720}
+                                        height={index === 0 ? 600 : 360}
+                                        seed={post.data.heroCanvas?.seed}
+                                    />
+                                )}
+                                <h4 class="title">{post.data.title}</h4>
+                                <p class="date">
+                                    <FormattedDate date={post.data.pubDate} />
+                                </p>
+                            </a>
+                        </li>
+                    ))
                 }
-                ul li {
-                    width: 100%;
-                    text-align: center;
-                }
-                ul li:first-child {
-                    margin-bottom: 0;
-                }
-                ul li:first-child .title {
-                    font-size: 1.563em;
-                }
-            }
-        </style>
-    </head>
-    <body>
-        <Header />
-        <main>
-            <section>
-                <ul>
-                    {
-                        posts.map((post, index) => (
-                            <li>
-                                <a href={`/blog/${post.id}/`}>
-                                    {post.data.heroImage ? (
-                                        <Image
-                                            width={index === 0 ? 1200 : 720}
-                                            height={index === 0 ? 600 : 360}
-                                            src={post.data.heroImage}
-                                            alt=""
-                                        />
-                                    ) : (
-                                        <GenHero
-                                            algorithm={randomAlgorithm()}
-                                            width={index === 0 ? 1200 : 720}
-                                            height={index === 0 ? 600 : 360}
-                                            seed={post.data.heroCanvas?.seed}
-                                        />
-                                    )}
-                                    <h4 class="title">{post.data.title}</h4>
-                                    <p class="date">
-                                        <FormattedDate
-                                            date={post.data.pubDate}
-                                        />
-                                    </p>
-                                </a>
-                            </li>
-                        ))
-                    }
-                </ul>
-            </section>
-        </main>
-        <Footer />
-    </body>
-</html>
+            </ul>
+        </section>
+    </main>
+</BaseLayout>
+<style>
+    ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+    }
+    ul li {
+        width: calc(50% - 1rem);
+    }
+    ul li * {
+        text-decoration: none;
+        transition: 0.2s ease;
+    }
+    ul li:first-child {
+        width: 100%;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    ul li:first-child .title {
+        font-size: 2.369rem;
+    }
+    ul li a {
+        display: block;
+    }
+    .title {
+        margin: 0;
+        color: rgb(var(--black));
+        line-height: 1;
+    }
+    .date {
+        margin: 0;
+        color: rgb(var(--gray));
+    }
+    ul li a:hover h4,
+    ul li a:hover .date {
+        color: rgb(var(--accent));
+    }
+    /* Target the new canvas element's class for the hover effect */
+    ul a:hover :global(.gen-hero-canvas) {
+        box-shadow: var(--box-shadow);
+    }
+    @media (max-width: 720px) {
+        ul {
+            gap: 0.5em;
+        }
+        ul li {
+            width: 100%;
+            text-align: center;
+        }
+        ul li:first-child {
+            margin-bottom: 0;
+        }
+        ul li:first-child .title {
+            font-size: 1.563em;
+        }
+    }
+</style>
