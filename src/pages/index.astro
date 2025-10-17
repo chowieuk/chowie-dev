@@ -2,6 +2,7 @@
 import BaseHead from "../components/BaseHead.astro";
 import Footer from "../components/Footer.astro";
 import Header from "../components/Header.astro";
+import ContentLayout from "../layouts/ContentLayout.astro";
 import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
 ---
 
@@ -12,7 +13,7 @@ import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
     </head>
     <body>
         <Header />
-        <main>
+        <ContentLayout>
             <h1>Greetings, Netizen!</h1>
             <p>Welcome to my over-engineered devlog.</p>
             <p>
@@ -24,7 +25,7 @@ import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
                 If it looks a little sparse, that's because we're only just
                 getting started.
             </p>
-        </main>
+        </ContentLayout>
         <Footer />
     </body>
 </html>

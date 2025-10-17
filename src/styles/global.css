@@ -17,8 +17,3 @@ video {
     max-width: 100%;
     display: block;
 }
-
-main {
-    max-width: min(80ch, 100% - 4rem);
-    margin-inline: auto;
-}

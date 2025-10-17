@@ -68,6 +68,15 @@ import HeaderLink from "./HeaderLink.astro";
         padding-left: inherit;
     }
     @media (max-width: 720px) {
+        body {
+            max-width: unset;
+        }
+        nav {
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding-block: 1rem;
+        }
         .social-links {
             display: none;
         }
