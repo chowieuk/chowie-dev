@@ -1,4 +1,6 @@
 // https://github.com/chrisloy/fractavibes
+// Original code Copyright 2025 Chris Loy.
+// Modified by Christopher Howie on Oct 16 2025 to constrain rendering to a central circle
 import { calculateCircularBounds } from "./shared";
 
 export function runColorFill(ctx, canvasWidth, canvasHeight, seedX, seedY) {
