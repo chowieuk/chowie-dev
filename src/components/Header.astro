@@ -10,6 +10,7 @@ import HeaderLink from "./HeaderLink.astro";
             <HeaderLink href="/">Home</HeaderLink>
             <HeaderLink href="/blog">Blog</HeaderLink>
             <HeaderLink href="/about">About</HeaderLink>
+            <HeaderLink href="/projects">Projects</HeaderLink>
         </div>
         <div class="social-links">
             <a href="https://github.com/chowieuk" target="_blank">
@@ -80,5 +81,16 @@ import HeaderLink from "./HeaderLink.astro";
         .social-links {
             display: none;
         }
+        .internal-links {
+            display: flex;
+            flex-wrap: nowrap; /* Prevents wrapping */
+            justify-content: center;
+            width: 100%;
+        }
+        /* Use if adding more header items */
+        /*nav a {
+            padding: 1em 0.25em;
+            font-size: 0.95rem;
+        }*/
     }
 </style>

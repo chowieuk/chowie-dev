@@ -7,10 +7,20 @@ import FormattedDate from "../components/FormattedDate.astro";
 import Header from "../components/Header.astro";
 import GenHero from "../components/GenHero.astro";
 import { randomAlgorithm } from "../consts";
-type Props = CollectionEntry<"blog">["data"];
+type Props = CollectionEntry<"projects">["data"];
 
-const { title, description, pubDate, updatedDate, heroImage, heroCanvas } =
-    Astro.props;
+const {
+    title,
+    description,
+    pubDate,
+    updatedDate,
+    heroImage,
+    heroIframe,
+    heroCanvas,
+} = Astro.props;
+
+const formatCssValue = (value: string | number) =>
+    typeof value === "number" ? `${value}px` : value;
 ---
 
 <html lang="en">
@@ -44,34 +54,6 @@ const { title, description, pubDate, updatedDate, heroImage, heroCanvas } =
                 padding: 1em;
                 color: rgb(var(--gray-dark));
             }
-            .prose :global(figure) {
-                display: block;
-                margin: 2rem auto;
-                width: fit-content;
-                max-width: 100%;
-            }
-
-            .prose :global(video),
-            .prose :global(img) {
-                border-radius: 8px;
-                display: block;
-                height: auto;
-                max-width: 100%;
-            }
-
-            .prose :global(figcaption) {
-                text-align: right;
-                font-size: 0.85em;
-                color: #666;
-                opacity: 0.8;
-                margin-top: 0.5em;
-                line-height: 1.4;
-            }
-
-            .prose :global(figcaption a) {
-                text-decoration: underline;
-                color: inherit;
-            }
             .title {
                 margin-bottom: 1em;
                 padding: 1em 0;
@@ -97,7 +79,19 @@ const { title, description, pubDate, updatedDate, heroImage, heroCanvas } =
             <article>
                 <div class="hero-container">
                     {
-                        heroImage ? (
+                        /* iframe > Image > GenHero (failover) */
+                        heroIframe ? (
+                            <iframe
+                                src={heroIframe.src}
+                                title={heroIframe.title}
+                                id={heroIframe.id}
+                                style={{
+                                    width: formatCssValue(heroIframe.width),
+                                    height: formatCssValue(heroIframe.height),
+                                    border: "none",
+                                }}
+                            />
+                        ) : heroImage ? (
                             <Image
                                 width={960}
                                 height={480}
