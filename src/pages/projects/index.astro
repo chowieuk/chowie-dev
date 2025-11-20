@@ -28,7 +28,10 @@ const posts = (await getCollection("projects"))
                                     />
                                 ) : (
                                     <GenHero
-                                        algorithm={randomAlgorithm()}
+                                        algorithm={
+                                            post.data.heroCanvas?.algorithm ??
+                                            randomAlgorithm()
+                                        }
                                         width={index === 0 ? 1200 : 720}
                                         height={index === 0 ? 600 : 360}
                                         seed={post.data.heroCanvas?.seed}
