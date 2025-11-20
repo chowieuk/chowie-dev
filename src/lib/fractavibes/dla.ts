@@ -1,6 +1,16 @@
-import Prando from "prando";
-import { calculateCircularBounds } from "./shared";
-import { db, type ParticleStep, type Color } from "./db";
+import { db, type Color } from "./db";
+import {
+  BYTES_PER_PARTICLE,
+  OFFSET_X,
+  OFFSET_Y,
+  OFFSET_R,
+  OFFSET_G,
+  OFFSET_B,
+} from "./dla.shared";
+
+// Import worker using Vite/Webpack syntax
+import DLAWorker from "./dla.worker?worker";
+import type { WorkerMessage } from "./dla.worker";
 
 export function runDLA(
   ctx: CanvasRenderingContext2D,
@@ -12,386 +22,171 @@ export function runDLA(
 ) {
   const w = canvasWidth;
   const h = canvasHeight;
-
   const safeSeedColor: Color = seedColor || { r: 255, g: 255, b: 255 };
-
-  // Cache ID includes dimensions and seed details for uniqueness
-  const cacheId = `dla_v2_${w}_${h}_${seedX}_${seedY}_${safeSeedColor.r}-${safeSeedColor.g}-${safeSeedColor.b}`;
+  const cacheId = `dla_v3_${w}_${h}_${seedX}_${seedY}_${safeSeedColor.r}-${safeSeedColor.g}-${safeSeedColor.b}`;
 
   let animationFrameId: number | null = null;
+  let worker: Worker | null = null;
   let isCancelled = false;
-
-  // Initialize deterministic RNG
-  const rng = new Prando(cacheId);
 
   ctx.clearRect(0, 0, w, h);
   const img = ctx.getImageData(0, 0, w, h);
 
-  // --- Shared Buffer Operations ---
-
-  function paintPixelBuffer(x: number, y: number, color: Color) {
+  // --- Canvas Helpers ---
+  function paintPixel(x: number, y: number, r: number, g: number, b: number) {
     if (x < 0 || x >= w || y < 0 || y >= h) return;
     const idx = (y * w + x) * 4;
-    img.data[idx] = color.r;
-    img.data[idx + 1] = color.g;
-    img.data[idx + 2] = color.b;
+    img.data[idx] = r;
+    img.data[idx + 1] = g;
+    img.data[idx + 2] = b;
     img.data[idx + 3] = 255;
   }
 
-  function clearPixelBuffer(x: number, y: number) {
+  function clearPixel(x: number, y: number) {
     if (x < 0 || x >= w || y < 0 || y >= h) return;
     const idx = (y * w + x) * 4;
-    img.data[idx + 3] = 0; // Set alpha to 0
+    img.data[idx + 3] = 0;
   }
 
-  // --- Initialization ---
+  function flush() {
+    ctx.putImageData(img, 0, 0);
+  }
 
-  (async () => {
-    try {
-      const cachedSim = await db.simulations.get(cacheId);
-
-      if (isCancelled) return;
-
-      if (cachedSim) {
-        // Cache hit: Play the boomerang animation immediately
-        runBoomerangMode(cachedSim.steps);
-      } else {
-        // Cache miss: Run simulation
-        runComputeMode();
-      }
-    } catch (e) {
-      console.error("DLA Cache Error, falling back to compute", e);
-      runComputeMode();
+  // --- DataView Renderer (Draws from Binary) ---
+  // This is used by both the Worker-Stream and the Boomerang
+  function drawBatchFromBuffer(buffer: ArrayBuffer, count: number) {
+    const view = new DataView(buffer);
+    for (let i = 0; i < count; i++) {
+      const offset = i * BYTES_PER_PARTICLE;
+      const x = view.getUint16(offset + OFFSET_X);
+      const y = view.getUint16(offset + OFFSET_Y);
+      const r = view.getUint8(offset + OFFSET_R);
+      const g = view.getUint8(offset + OFFSET_G);
+      const b = view.getUint8(offset + OFFSET_B);
+      paintPixel(x, y, r, g, b);
     }
-  })();
+    flush();
+  }
 
-  // --- Mode 1: Boomerang (Playback) ---
+  // --- Mode 1: Worker Computation ---
+  function startWorker() {
+    worker = new DLAWorker();
 
-  function runBoomerangMode(steps: ParticleStep[]) {
-    let currentStepIndex = 0;
-    let direction = 1; // 1 = Forward (Build), -1 = Reverse (Erase)
+    // Configure Worker
+    worker.postMessage({
+      width: w,
+      height: h,
+      seedX,
+      seedY,
+      seedColor: safeSeedColor,
+      cacheId,
+    });
 
-    // Speed multiplier for playback
-    const STEPS_PER_FRAME = 400;
+    // Listen for updates
+    worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+      if (isCancelled) return;
+      const { type, buffer, count } = e.data;
+
+      if (type === "BATCH") {
+        // Draw the realtime progress
+        drawBatchFromBuffer(buffer, count);
+      } else if (type === "DONE") {
+        // 1. Draw final bits just in case
+        drawBatchFromBuffer(buffer, count);
+
+        // 2. Save Binary to DB
+        db.simulations
+          .add({
+            id: cacheId,
+            buffer: buffer, // This is the full ArrayBuffer
+            count: count,
+            timestamp: Date.now(),
+          })
+          .catch((err) => console.error("DB Save failed", err));
+
+        // 3. Switch to Boomerang Mode
+        runBoomerangMode(buffer, count);
+
+        // 4. Cleanup
+        worker?.terminate();
+        worker = null;
+      }
+    };
+  }
+
+  // --- Mode 2: Boomerang (Binary Playback) ---
+  function runBoomerangMode(buffer: ArrayBuffer, totalCount: number) {
+    const view = new DataView(buffer);
+    let currentIndex = 0;
+    let direction = 1; // 1 = build, -1 = erase
+    const SPEED = 500; // particles per frame
 
     function frame() {
       if (isCancelled) return;
 
-      for (let i = 0; i < STEPS_PER_FRAME; i++) {
+      for (let k = 0; k < SPEED; k++) {
         if (direction === 1) {
-          // Forward: Draw particles
-          if (currentStepIndex >= steps.length) {
+          if (currentIndex >= totalCount) {
             direction = -1;
-            currentStepIndex = steps.length - 1;
+            currentIndex = totalCount - 1;
           } else {
-            const s = steps[currentStepIndex];
-            paintPixelBuffer(s.x, s.y, s.color);
-            currentStepIndex++;
+            const offset = currentIndex * BYTES_PER_PARTICLE;
+            const x = view.getUint16(offset + OFFSET_X);
+            const y = view.getUint16(offset + OFFSET_Y);
+            const r = view.getUint8(offset + OFFSET_R);
+            const g = view.getUint8(offset + OFFSET_G);
+            const b = view.getUint8(offset + OFFSET_B);
+            paintPixel(x, y, r, g, b);
+            currentIndex++;
           }
         } else {
-          // Reverse: Erase particles
-          if (currentStepIndex < 0) {
+          if (currentIndex < 0) {
             direction = 1;
-            currentStepIndex = 0;
+            currentIndex = 0;
           } else {
-            const s = steps[currentStepIndex];
-            clearPixelBuffer(s.x, s.y);
-            currentStepIndex--;
+            const offset = currentIndex * BYTES_PER_PARTICLE;
+            const x = view.getUint16(offset + OFFSET_X);
+            const y = view.getUint16(offset + OFFSET_Y);
+            clearPixel(x, y);
+            currentIndex--;
           }
         }
       }
 
-      ctx.putImageData(img, 0, 0);
+      flush();
       animationFrameId = requestAnimationFrame(frame);
     }
 
     animationFrameId = requestAnimationFrame(frame);
   }
 
-  // --- Mode 2: Compute (Simulation) ---
+  // --- Initialization ---
+  (async () => {
+    try {
+      const cached = await db.simulations.get(cacheId);
 
-  function runComputeMode() {
-    const visited = new Set<number>();
-    const recordedSteps: ParticleStep[] = [];
-
-    const {
-      centerX: circleCenterX,
-      centerY: circleCenterY,
-      radius: circleRadius,
-      isInBounds,
-    } = calculateCircularBounds(w, h, seedX, seedY);
-
-    // Seed initialization
-    if (isInBounds(seedX, seedY)) {
-      paintPixelBuffer(seedX, seedY, safeSeedColor);
-      visited.add(seedY * w + seedX);
-      recordedSteps.push({ x: seedX, y: seedY, color: safeSeedColor });
-    }
-    ctx.putImageData(img, 0, 0);
-
-    let aggregatedParticlesCount = 1;
-    const MAX_PARTICLES =
-      Math.floor(Math.PI * circleRadius * circleRadius) || 10;
-
-    // Performance Tuning
-    const PARTICLES_PER_FRAME = 250;
-    const MAX_WALKER_STEPS = 5000;
-    const DRAW_INTERVAL = 50;
-
-    // Spawning Phase State
-    let fillPhaseActive = false;
-    let particlesSinceLastDraw = 0;
-
-    // Bounding box of the aggregate
-    let minX = seedX,
-      maxX = seedX,
-      minY = seedY,
-      maxY = seedY;
-
-    // Simulation Parameters
-    const DLA_SIMILARITY_PERCENT = 0.98;
-    const DLA_SIMILAR_VARIATION = 3;
-    const DLA_DISSIMILAR_VARIATION = 20;
-
-    // --- Helper: Neighbor Colors ---
-    function getDlaNeighborColors(x: number, y: number): Color[] {
-      const colors: Color[] = [];
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = x + dx,
-            ny = y + dy;
-          // Using shared visited set and isInBounds closure
-          if (isInBounds(nx, ny) && visited.has(ny * w + nx)) {
-            const idx = (ny * w + nx) * 4;
-            colors.push({
-              r: img.data[idx],
-              g: img.data[idx + 1],
-              b: img.data[idx + 2],
-            });
-          }
-        }
-      }
-      return colors;
-    }
-
-    // --- Helper: Color Generation ---
-    function generateDlaInfluencedColor(neighborColors: Color[]): Color {
-      if (neighborColors.length === 0) {
-        // Replaced Math.random() with rng.next()
-        return {
-          r: rng.next() * 255,
-          g: rng.next() * 255,
-          b: rng.next() * 255,
-        };
-      }
-
-      const sum = neighborColors.reduce(
-        (acc, col) => ({
-          r: acc.r + col.r,
-          g: acc.g + col.g,
-          b: acc.b + col.b,
-        }),
-        { r: 0, g: 0, b: 0 },
-      );
-
-      const avg = {
-        r: sum.r / neighborColors.length,
-        g: sum.g / neighborColors.length,
-        b: sum.b / neighborColors.length,
-      };
-
-      const useSimilar =
-        neighborColors.length >= 3 || rng.next() < DLA_SIMILARITY_PERCENT;
-
-      const variation = useSimilar
-        ? DLA_SIMILAR_VARIATION
-        : DLA_DISSIMILAR_VARIATION;
-
-      // Dimming factor based on density
-      const factor =
-        neighborColors.length >= 2
-          ? 1 / Math.pow(neighborColors.length, 0.17)
-          : 1;
-
-      return {
-        r:
-          Math.min(
-            255,
-            Math.max(0, avg.r + (rng.next() - 0.5) * variation * 2),
-          ) * factor,
-        g:
-          Math.min(
-            255,
-            Math.max(0, avg.g + (rng.next() - 0.5) * variation * 2),
-          ) * factor,
-        b:
-          Math.min(
-            255,
-            Math.max(0, avg.b + (rng.next() - 0.5) * variation * 2),
-          ) * factor,
-      };
-    }
-
-    // --- Main Compute Step ---
-    function step() {
       if (isCancelled) return;
 
-      // Check completion
-      if (aggregatedParticlesCount >= MAX_PARTICLES) {
-        ctx.putImageData(img, 0, 0);
-        animationFrameId = null;
-
-        // Save to DB
-        db.simulations
-          .add({
-            id: cacheId,
-            steps: recordedSteps,
-            timestamp: Date.now(),
-          })
-          .then(() => {
-            // Switch to Boomerang mode seamlessly after saving
-            if (!isCancelled) runBoomerangMode(recordedSteps);
-          })
-          .catch((e) => console.error("Failed to save DLA", e));
-
-        return;
+      if (cached) {
+        // Cache Hit: Zero calculation, instant binary playback
+        console.log("DLA Cache Hit (Binary)");
+        runBoomerangMode(cached.buffer, cached.count);
+      } else {
+        // Cache Miss: Offload to Worker
+        console.log("DLA Cache Miss - Starting Worker");
+        startWorker();
       }
-
-      // Process batch of particles
-      for (let i = 0; i < PARTICLES_PER_FRAME; i++) {
-        if (aggregatedParticlesCount >= MAX_PARTICLES) break;
-
-        let walkerX = 0;
-        let walkerY = 0;
-        let spawnedSuccessfully = false;
-        const MAX_SPAWN_ATTEMPTS = 100;
-
-        // --- Spawning Logic ---
-        for (let attempt = 0; attempt < MAX_SPAWN_ATTEMPTS; attempt++) {
-          if (!fillPhaseActive) {
-            // PHASE 1: Growth Phase (Ring around aggregate)
-            const aggregateCenterX = (minX + maxX) / 2;
-            const aggregateCenterY = (minY + maxY) / 2;
-            const radiusX = Math.max(
-              aggregateCenterX - minX,
-              maxX - aggregateCenterX,
-            );
-            const radiusY = Math.max(
-              aggregateCenterY - minY,
-              maxY - aggregateCenterY,
-            );
-            const aggregateRadius = Math.sqrt(
-              radiusX * radiusX + radiusY * radiusY,
-            );
-
-            // Check boundaries
-            if (aggregateRadius + 15 >= circleRadius) {
-              fillPhaseActive = true;
-            } else {
-              const spawnRadius = aggregateRadius + 15;
-              const angle = rng.next() * 2 * Math.PI;
-              walkerX = Math.floor(
-                aggregateCenterX + spawnRadius * Math.cos(angle),
-              );
-              walkerY = Math.floor(
-                aggregateCenterY + spawnRadius * Math.sin(angle),
-              );
-            }
-          }
-
-          if (fillPhaseActive) {
-            // PHASE 2: Fill Phase (Random inside circle)
-            const angle = rng.next() * 2 * Math.PI;
-            // Use sqrt for uniform distribution in a circle
-            const radius = circleRadius * Math.sqrt(rng.next());
-            walkerX = Math.floor(circleCenterX + radius * Math.cos(angle));
-            walkerY = Math.floor(circleCenterY + radius * Math.sin(angle));
-          }
-
-          // Ensure spawn point is valid and not occupied
-          if (
-            isInBounds(walkerX, walkerY) &&
-            !visited.has(walkerY * w + walkerX)
-          ) {
-            spawnedSuccessfully = true;
-            break;
-          }
-        }
-
-        if (!spawnedSuccessfully) continue;
-
-        // --- Walking Logic ---
-        let currentWalkerSteps = 0;
-        while (currentWalkerSteps < MAX_WALKER_STEPS) {
-          currentWalkerSteps++;
-          let isAdjacentToAggregate = false;
-
-          // Check for neighbors
-          for (let dy = -1; dy <= 1; dy++) {
-            for (let dx = -1; dx <= 1; dx++) {
-              if (dx === 0 && dy === 0) continue;
-              const nx = walkerX + dx;
-              const ny = walkerY + dy;
-              if (isInBounds(nx, ny) && visited.has(ny * w + nx)) {
-                isAdjacentToAggregate = true;
-                break;
-              }
-            }
-            if (isAdjacentToAggregate) break;
-          }
-
-          if (isAdjacentToAggregate) {
-            // Aggregate the particle
-            const neighbors = getDlaNeighborColors(walkerX, walkerY);
-            const newColor = generateDlaInfluencedColor(neighbors);
-
-            paintPixelBuffer(walkerX, walkerY, newColor);
-            visited.add(walkerY * w + walkerX);
-            recordedSteps.push({ x: walkerX, y: walkerY, color: newColor });
-
-            // Update bounding box
-            minX = Math.min(minX, walkerX);
-            maxX = Math.max(maxX, walkerX);
-            minY = Math.min(minY, walkerY);
-            maxY = Math.max(maxY, walkerY);
-
-            aggregatedParticlesCount++;
-            particlesSinceLastDraw++;
-            break; // Stop walking this particle
-          }
-
-          // Move Randomly
-          const moveDx = Math.floor(rng.next() * 3) - 1;
-          const moveDy = Math.floor(rng.next() * 3) - 1;
-          const nextX = walkerX + moveDx;
-          const nextY = walkerY + moveDy;
-
-          if (!isInBounds(nextX, nextY)) continue;
-          if (visited.has(nextY * w + nextX)) continue;
-
-          walkerX = nextX;
-          walkerY = nextY;
-        }
-      }
-
-      // Update Canvas
-      if (particlesSinceLastDraw >= DRAW_INTERVAL) {
-        ctx.putImageData(img, 0, 0);
-        particlesSinceLastDraw = 0;
-      }
-
-      animationFrameId = requestAnimationFrame(step);
+    } catch (e) {
+      console.error("Error loading DLA", e);
+      startWorker(); // Fallback
     }
-
-    animationFrameId = requestAnimationFrame(step);
-  }
+  })();
 
   return {
     cancel: () => {
       isCancelled = true;
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      animationFrameId = null;
+      if (worker) worker.terminate();
     },
   };
 }

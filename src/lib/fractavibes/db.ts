@@ -6,15 +6,10 @@ export interface Color {
   b: number;
 }
 
-export interface ParticleStep {
-  x: number;
-  y: number;
-  color: Color;
-}
-
 export interface SimulationCache {
   id: string;
-  steps: ParticleStep[];
+  buffer: ArrayBuffer; // Storing raw binary data
+  count: number; // Number of particles
   timestamp: number;
 }
 
@@ -23,8 +18,9 @@ class DLADatabase extends Dexie {
 
   constructor() {
     super("DLADatabase");
-    this.version(1).stores({
-      simulations: "id", // Primary key
+    // Version 2: buffer storage
+    this.version(2).stores({
+      simulations: "id",
     });
   }
 }
