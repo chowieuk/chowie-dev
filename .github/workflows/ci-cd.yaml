@@ -1,8 +1,9 @@
-name: Build and Deploy Astro Frontend
+name: Build and Deploy Blog
 
 on:
   push:
     branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
@@ -37,16 +38,24 @@ jobs:
           path: chowie-dev-config
           ssh-key: ${{ secrets.CONFIG_REPO_DEPLOY_KEY }}
 
-      - name: Update Kubernetes manifest
+      - name: Install Kustomize
         run: |
-          # Note the path: we assume manifests are in apps/astro-frontend
-          sed -i 's|image:.*|image: ghcr.io/chowieuk/chowie-dev@${{ steps.build-and-push.outputs.digest }}|' chowie-dev-config/apps/astro-frontend/deployment.yaml
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+          sudo mv kustomize /usr/local/bin/
+
+      - name: Update Staging Image
+        working-directory: chowie-dev-config/apps/blog/overlays/staging
+        run: |
+          kustomize edit set image ghcr.io/chowieuk/chowie-dev=ghcr.io/chowieuk/chowie-dev@${{ steps.build-and-push.outputs.digest }}
 
       - name: Commit and push changes
+        working-directory: chowie-dev-config
         run: |
-          cd chowie-dev-config
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions-bot@github.com"
-          git add .
-          git commit -m "Update image for astro-frontend to ${{ github.sha }}" || echo "No changes to commit"
+
+          git add apps/blog/overlays/staging/kustomization.yaml
+
+          git commit -m "ci(staging): update blog image to ${{ github.sha }}" || echo "No changes to commit"
+          git pull --rebase origin main
           git push
