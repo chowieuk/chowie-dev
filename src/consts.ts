@@ -2,6 +2,7 @@ import { z } from "zod";
 import { runColorFill } from "./lib/fractavibes/colorfill";
 import { runDLA } from "./lib/fractavibes/dla";
 import { runInkDrop } from "./lib/fractavibes/inkdrop";
+import { runMaze } from "./lib/fractavibes/maze";
 import { runSpiral } from "./lib/fractavibes/spiral";
 export const SITE_TITLE = "CHowie.dev";
 export const SITE_DESCRIPTION = "The Dev Log of Christopher Howie";
@@ -11,6 +12,7 @@ export const algorithms = {
   colorfill: runColorFill,
   spiral: runSpiral,
   inkdrop: runInkDrop,
+  maze: runMaze,
 } as const;
 
 export type AlgorithmName = keyof typeof algorithms;

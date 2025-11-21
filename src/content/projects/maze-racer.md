@@ -9,14 +9,7 @@ heroIframe:
   height: "92vh"
   src: "https://maze.chowie.dev"
 heroCanvas:
-  algorithm: "dla"
-  seed:
-    x: 0
-    y: 0
-    color:
-      r: 27.226518688668907
-      g: 146.01956566843717
-      b: 158.5673898621948
+  algorithm: "maze"
 
 ---
 
