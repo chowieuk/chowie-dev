@@ -106,9 +106,7 @@ const { title, description, pubDate, updatedDate, heroImage, heroCanvas } =
                             />
                         ) : (
                             <GenHero
-                                algorithm={
-                                    heroCanvas?.algorithm ?? randomAlgorithm()
-                                }
+                                algorithm={heroCanvas?.algorithm}
                                 width={960}
                                 height={480}
                                 seed={heroCanvas?.seed}

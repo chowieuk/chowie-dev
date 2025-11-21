@@ -1,7 +1,7 @@
 // Adapted from https://github.com/chrisloy/fractavibes
 
 import { useRef, useEffect, forwardRef, useImperativeHandle } from "react";
-import { algorithms, type AlgorithmName } from "../consts";
+import { algorithms, type AlgorithmName, randomAlgorithm } from "../consts";
 
 export interface CanvasAnimation {
   cancel: () => void;
@@ -9,7 +9,7 @@ export interface CanvasAnimation {
 
 // Props now include width and height, but no longer need 'layout'
 export interface AnimatedCanvasProps {
-  algorithm: AlgorithmName;
+  algorithm?: AlgorithmName;
   className?: string;
   width: number;
   height: number;
@@ -58,7 +58,9 @@ const AnimatedCanvas = forwardRef<AnimatedCanvasRef, AnimatedCanvasProps>(
           ? initialY
           : Math.floor(height / 2);
 
-      const selectedAlgorithm = algorithms[algorithm];
+      const algoToRun = algorithm ?? randomAlgorithm();
+      const selectedAlgorithm = algorithms[algoToRun];
+
       if (selectedAlgorithm) {
         currentAnimationRef.current = selectedAlgorithm(
           context,
